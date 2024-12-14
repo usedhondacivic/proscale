@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>ProScale</title>
+
+    <!-- seo -->
+    <meta name="author" content="Michael Crum, Zehui Lin (zl883)">
+    <meta name="description" content="ProScale - Smart, Contact Free Kitchen Scale">
+    <meta name="keywords" content="robotics">
+
+    <!-- display -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+
+    <!-- icon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="../global_assets/icons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../global_assets/icons/favicon-16x16.png" />
+
+    <!-- stylesheets -->
+    <link rel="stylesheet" href="./styles/index.css">
+    <link rel="stylesheet" href="./styles/highlight/styles/base16/bright.min.css">
+    <link rel="stylesheet" href="./styles/katex/katex.min.css">
+
+    <!-- syntax highlighting-->
+    <script src="../styles/highlight/highlight.min.js"></script>
+    <script src="../styles/highlight/languages/verilog.min.js"></script>
+    <script>
+        hljs.highlightAll();
+    </script>
+
+    <!-- latex support-->
+    <script defer src="../styles/katex/katex.min.js"></script>
+
+    <!-- font -->
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
+
+    <!-- iFrame optimization -->
+    <script>
+        checkVisibility();
+        document.addEventListener("scroll", (event) => {
+            checkVisibility();
+        });
+
+        function checkVisibility() {
+            const frames = document.getElementsByTagName("iframe");
+            for (var i = 0; i < frames.length; i++) {
+                frame = frames[i];
+                if (isInViewport(frame)) {
+                    frame.style.visibility = "visible";
+                } else {
+                    frame.style.visibility = "hidden";
+                }
+            }
+        }
+
+        function isInViewport(elm) {
+            var rect = elm.getBoundingClientRect();
+            var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+            return !(rect.bottom < 0 || rect.top - viewHeight >= 0);
+        }
+    </script>
+</head>
+
+<body>
+    <article id="article">
+        <h1>ProScale - A Smart, Gesture Controlled, Contact Free Kitchen Scale</h1>
+<p><em>By Michael Crum (mmc323@cornell.edu) and Zehui Lin (zl883)</em></p>
+<p><img src="./assets/banner.webp" alt="Banner"></p>
+<h2>Objective</h2>
+<p>In our final project, we developed a kitchen scale with gesture-based controls, utilizing a Raspberry Pi, a load cell with an HX711 sensor, and a piTFT display.
+Motivated by the challenges of maintaining hygiene in the kitchen, we set out to create a hands-free solution that also enhances accessibility for individuals with limited mobility.
+Users can easily weigh ingredients, switch units, and navigate recipes through a gesture-based interface on the piTFT screen, enhancing the kitchen prep experience.</p>
+<h2>Introduction</h2>
+<p>This project integrates hardware and software to build a gesture-controlled kitchen scale.
+At its core, the system utilizes a Raspberry Pi for processing, with a PiCamera for real-time video capture, a load cell with HX711 sensor for weight measurements, and a piTFT display serving as the user interface, all housed in a custom laser-cut case.
+The captured video is pre-processed using OpenCV for frame flipping, color conversion, and scaling, followed by MediaPipe for detecting 21 hand landmarks.
+By analyzing the positions and distances of these landmarks, gestures like pinching and pointing are identified and mapped to actions like navigating recipes, switching units, and the tare function.
+The interface, developed using PyGame, dynamically updates in response to cursor movement and click events, providing a touch-free, hygienic, and accessible user experience.</p>
+<h2>High-Level System Design</h2>
+<blockquote>
+<p>Figure 1: High-Level System Design</p>
+</blockquote>
+<h2>Hardware Setup</h2>
+<blockquote>
+<p>Figure2: Final Hardware Setup</p>
+</blockquote>
+<h2>OpenCV and MediaPipe Implementation</h2>
+<blockquote>
+<p>Figure 3: Hand Landmarks</p>
+</blockquote>
+<p>Google MediaPipe is a collection of optimized tools for applying machine learning models for various computer vision tasks.
+Of particular interest to us is the hand landmarks model, which identifies hands within an input image and extracts the location of each joint.
+See figure todo for a diagram of each landmark output from the algorithm.
+Each landmark has a corresponding x and y location in screen space, as well as an estimate of z - the depth of the landmark.</p>
+<p>MediaPipe requires video input to process.
+We decided to use a picamera because it is widely supported and well documented.
+We installed the picamera python driver using sudo apt install -y python3-picamera2, then ran a simple test program to open a preview window:</p>
+<pre><code class="language-python">from picamera2 import Picamera2, Preview
+import time
+picam2 = Picamera2()
+camera_config = picam2.create_still_configuration(main={&quot;size&quot;: (1920, 1080)}, lores={&quot;size&quot;: (640, 480)}, display=&quot;lores&quot;)
+picam2.configure(camera_config)
+picam2.start_preview(Preview.QTGL)
+picam2.start()
+time.sleep(60)
+</code></pre>
+<p>This example requires an X server connection and the QTGL driver to be available.
+This is only the case when running the graphical desktop through the RPi’s HDMI port, and doesn’t work over an SSH connection.
+To run the example over SSH, it is possible to forward the local X server using <code>ssh -x</code>, although the QTGL driver won’t be available. Instead, you’ll need to switch <code>Preview.QTGL</code> to <code>Preview.QT</code>.</p>
+<p>Because our system is intended to run without an external display, we next looked for a way to display the piTFT’s output on the TFT’s screen. QT provides a framebuffer driver, but we were unable to make it function in our testing. Instead, we chose to write directly to the TFT’s frame buffer. This can be achieved as shown in the following snippet:</p>
+<p>TODO</p>
+<p>With the picam up and running, we installed MediaPipe using <code>sudo pip install mediapipe</code> (<code>sudo</code> for compatibility with PyGame, which requires root to display on the TFT).
+We were able to display an annotated diagram from the hand recognition model using the following snippet:</p>
+<p>TODO</p>
+<h2>Weight Measurement</h2>
+<p>The weight measurement module combines the HX711 sensor, the 5kg load cell, and the Raspberry Pi to obtain weight readings.
+The hardware configuration began with connecting the HX711's data (DT) and clock (SCK) pins to GPIO 5 and 6, respectively, and connecting three physical buttons on piTFT to GPIO pins 17, 22, and 27 for critical functions such as tare, unit switching, and quit.
+These buttons were added as a convenient and straightforward interface to streamline the testing process.</p>
+<p>With the setup complete, we began testing the weight measurement module with the library <code>clone git@github.com:tatobari/hx711py.git</code>.
+However, when running the example code, we encountered challenges with obtaining valid weight readings. Despite verifying that the power supply, DT, and SCK pins were functioning correctly using a multimeter, we observed no small voltage changes across the signal wires (A+ and A-) when weight was applied.
+Further multimeter diagnostics indicated abnormally low resistance between A+ and A-, indicating a potential fault in the load cell itself.
+To address this, we replaced the load cell with a new component.
+We then tested the system again, confirmed stable voltage across the signal and excitation wires, and successfully obtained weight measurements.
+Then we calibrated the system using a 100g reference weight to further refine the weight measurement process.</p>
+<p>Another issue arose due to the time-sensitive nature of polling bits from the HX711 on the Raspberry Pi.
+The Raspberry Pi running on the Linux-based operating system may prioritize other tasks over GPIO operations, leading to occasional random or noisy values in the weight readings.
+To mitigate this issue, we initially implemented an exponential smoothing method to stabilize the output, which calculates a weighted average of the current reading and the previous smoothed value using the following formula:</p>
+<p>Smoothed Value=<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>α</mi><mo>×</mo></mrow><annotation encoding="application/x-tex">\alpha \times</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mord">×</span></span></span></span></eq>Current Value<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>+</mo><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>α</mi><mo stretchy="false">)</mo><mo>×</mo></mrow><annotation encoding="application/x-tex">+(1−\alpha)\times</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">+</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mclose">)</span><span class="mord">×</span></span></span></span></eq>Previous Smoothed Value</p>
+<p>where α is the smoothing factor.
+However, this approach did not perform as expected, possibly due to the frequent large noise fluctuations, regardless of the choice of α.</p>
+<p>We then used a median filter to reduce the effect.
+A buffer was used to store the ten most recent readings, and the median of these values was returned as the current weight.
+This sliding window approach effectively removed large outliers and provided a relatively consistent measurement.
+It also ensured that random fluctuations had less impact while still allowing the system to adapt to real weight changes.</p>
+<p>Functional testing verified the proper operation of all core features.
+The tare function can reset the weight to zero by taking the current raw reading from the sensor and setting it as the offset.
+And the unit toggle enables switching between grams and ounces using the setUnit() function, with the conversion handled in the rawBytesToWeight() function by multiplying the weight in grams by the conversion factor 0.035274 when switched to ounces.
+And the quit button enabled a smooth shutdown with GPIO cleanup.</p>
+<h2>Menu Design</h2>
+<h3>Initial Design</h3>
+<p>The initial design of the menu was structured around simplicity and intuitive navigation.
+It included a Main Menu with two primary options: Scale Mode and Recipe Mode.
+Scale Mode provided real-time weight measurements, as well as unit conversion and tare capability.
+Recipe Mode allowed users to browse recipes and follow step-by-step instructions, with navigation buttons for switching between recipes and steps.
+Upon completion of a recipe, users were prompted with a feedback screen to like or dislike the recipe.</p>
+<blockquote>
+<p>Figure 4: Initial Menu Design</p>
+</blockquote>
+<h3>Final Design</h3>
+<p>In our final design, we chose to incorporate the scale mode directly into the home page and orient the piTFT screen vertically.
+By combining the scale mode with the home screen, users can perform weight measurements, tare, and unit switching without navigating away, streamlining functionality and reducing complexity.
+The vertical orientation further improves usability by optimizing the display for button and reading flow, as well as allowing for larger text and images, making it easier to follow instructions and see real-time measurements at a glance.</p>
+<p>The Home page is the initial interface displayed upon starting the system, providing access to core scale functions and navigation options.
+It prominently shows real-time weight readings from the HX711 sensor at the bottom, which is dynamically updated by the draw() function The top section features buttons for tare and unit switching, which can be activated through gestures detected by the check_click(), triggering respective functions such as self.hx.tare() to reset the scale and self.hx.setUnit() to toggle between grams and ounces. And the Recipes button directs users to the recipe page.</p>
+<p>On the Recipe Home page, the bottom area displays an image of the stored recipe, loaded dynamically from json files using pygame.image.load and scaled with pygame.transform.rotozoom.
+The top section includes a Home button, allowing users to return to the home page. And users can cycle through the recipes by “clicking” the “&lt;&lt;&lt;” and ”&gt;&gt;&gt;” buttons. The check_click() function handles navigation by updating the self.recipe_index variable, while the draw function ensures that the image is rendered in real-time.</p>
+<p>The interface on the Recipe Details page combines step-by-step recipe instructions with real-time weight measurements to streamline the cooking process. The topmost part contains the Home and Return buttons that allow users to return to the home page or recipe home page, respectively. Weight measurements with the unit are shown below, along with Tare and Unit buttons, like on the Home page. And the recipe instructions are loaded from json files at the bottom. The instructions are dynamically rendered and are updated when a pinching gesture is detected, which helps users easily progress to the next step without touching the device. Specifically, pinching left moves to the previous step, while pinching right progresses to the next step. By integrating real-time weight measurements with dynamically updated instructions, the Recipe Details page provides an intuitive and efficient user experience.</p>
+<blockquote>
+<p>Figure 5: Home Page, Recipe Home Page, and Recipe Details Page (from left to right). The blue point indicates the gesture-detected cursor.</p>
+</blockquote>
+<h3>Integration</h3>
+<p>After designing the individual pages, we wrote gui.py to tie together the menu components, ensuring smooth transitions and interactions across screens.
+It utilizes the GUIStates enum to manage the screens and switches between them dynamically.
+The tick() function redraws the screen and updates the cursor position based on gesture inputs. Gesture-based interaction is facilitated by the cursor_pos_handler() and click_handler, which handle cursor movement and click events triggered by MediaPipe-detected gestures.
+Each screen is registered as a GUI element through the add_gui_element() function, creating a modular structure that supports future scalability.
+This integrated design ensures a simple and easy-to-use user experience across the entire interface.</p>
+<p>Finally, app.py was implemented to integrate all components, connecting the GUI, gesture recognition, and hardware functionalities.
+The script first initializes the piTFT display, the Interaction module for gesture processing, and the GUI object.
+Interaction callbacks bring gesture inputs to the GUI, with cursor_pos_handler() updating the cursor position and click_handler() performing page-specific actions.
+To ensure smooth operation, app.py makes use of multithreading, with one thread processing gesture inputs in real-time and another updating the piTFT display at 30 frames per second using the tick() function.
+By combining these aspects, app.py provides rapid screen transitions and cohesive interaction across all components, giving a scalable, efficient, and intuitive user experience.</p>
+<h2>Results</h2>
+<p>Overall, we’ve achieved the goals outlined in the description and delivered a functional prototype that integrated gesture-based controls, weight measurement, and recipe navigation.
+Core functionalities were all successfully implemented and tested. Gesture detection powered by Picamera and MediaPipe successfully identified hand gestures such as pinching and pointing, enabling precise and intuitive interactions.
+The weighting function, driven by the HX711 sensor and a 5kg load cell, provided accurate and stable weight readings after resolving initial hardware issues and implementing a robust median filter.
+The GUI design, which includes a home page, a recipe home page, and a recipe details page, simplifies users' prep experience while ensuring hygiene and accessibility, with the piTFT seamlessly updating the interface in real time.</p>
+<h2>Conclusion</h2>
+<p>Future Work
+TODO (if any)
+We would also integrate a microcontroller to handle the precise bit-polling required by the HX711 sensor, reducing the impact of the Raspberry Pi's multitasking on measurement reliability. We would also have provided a feedback page at the end of each recipe, allowing users to like or dislike recipes, as well as the ability to customize ingredient quantities to suit their preferences or serving sizes.</p>
+<p>Budget
+Raspberry Pi 4 &amp; piTFT - Provided in the lab
+Raspberry Pi Camera - Provided in the lab
+5kg Load Cell &amp; HX711 Weight Sensor - $6
+Contribution</p>
+<p>Code Appendix</p>
+<p>Reference
+Software
+MediaPipe
+https://pypi.org/project/mediapipe-rpi4/
+https://mediapipe.readthedocs.io/en/latest/solutions/hands.html</p>
+<p>OpenCV
+https://raspberrypi-guide.github.io/programming/install-opencv
+https://opencv.org/</p>
+<p>HX711
+https://github.com/tatobari/hx711py/tree/master</p>
+<p>Hardware
+PiCamera
+https://picamera.readthedocs.io/en/release-1.13/index.html
+https://projects.raspberrypi.org/en/projects/getting-started-with-picamera</p>
+<p>HX711 sensor &amp; Load Cell
+https://tutorials-raspberrypi.com/digital-raspberry-pi-scale-weight-sensor-hx711/#google_vignette</p>
+<p>Past Student Project
+Gesture Home
+https://courses.ece.cornell.edu/ece5990/ECE5725_Fall2023_Projects/4%20Friday%20December%208/5%20Gesture%20Home%20/GestureHome_web/index.html</p>
+
+    </article>
+    <div id="right_pad"></div>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+{
+    "title": "Test Recipe",
+    "image": "muffin.jpg",
+    "steps": [
+        "Measure out 2 ounces of whirlygig",
+        "Combine thingamabob and whirlygig\n stir thoroughly",
+        "Enjoy!",
+	"Measure out 100 g of thingamabob"
+
+    ]
+}
